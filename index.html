@@ -6,7 +6,6 @@
     <title>BroChat Pro - Secure Private Chat</title>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-storage-compat.js"></script>
     
     <style>
         :root {
@@ -53,7 +52,6 @@
         #msg-input { flex: 1; border: none; padding: 10px 15px; border-radius: 20px; background: #2a3942; color: white; }
         .icon-btn { color: #8696a0; font-size: 20px; cursor: pointer; padding: 5px; }
         
-        #file-input { display: none; }
         .dark-toggle { font-size: 20px; cursor: pointer; }
     </style>
 </head>
@@ -78,7 +76,7 @@
         </header>
         <div id="messages"></div>
         <div class="input-area">
-            <label class="icon-btn">📎<input type="file" id="file-input" onchange="uploadFile(this)"></label>
+            <span class="icon-btn" onclick="sendImage()">🖼️</span>
             <input type="text" id="msg-input" placeholder="Type a message..." oninput="handleTyping()">
             <button id="send-btn" onclick="sendMessage()" style="width: auto; margin: 0; padding: 8px 15px;">➤</button>
         </div>
@@ -97,7 +95,6 @@
 
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-        const storage = firebase.storage();
         let currentRoom = '';
         let roomPass = '';
         const userId = 'user_' + Math.floor(Math.random() * 1000000);
@@ -115,7 +112,6 @@
             document.getElementById('chat-screen').style.display = 'flex';
             document.getElementById('display-room').innerText = '#' + currentRoom;
 
-            // Listen for messages
             db.ref('rooms/' + currentRoom + '/messages').on('child_added', (snapshot) => {
                 const data = snapshot.val();
                 displayMessage(data, snapshot.key);
@@ -124,7 +120,6 @@
                 }
             });
 
-            // Listen for updates (read receipts)
             db.ref('rooms/' + currentRoom + '/messages').on('child_changed', (snapshot) => {
                 const msgEl = document.getElementById('msg-' + snapshot.key);
                 if (msgEl && snapshot.val().read) {
@@ -133,7 +128,6 @@
                 }
             });
 
-            // Typing Indicator
             db.ref('rooms/' + currentRoom + '/typing').on('value', (snap) => {
                 const typingUsers = snap.val() || {};
                 const othersTyping = Object.keys(typingUsers).filter(id => id !== userId).length > 0;
@@ -164,18 +158,14 @@
             input.value = '';
         }
 
-        async function uploadFile(input) {
-            const file = input.files[0];
-            if (!file) return;
-            const ref = storage.ref('rooms/' + currentRoom + '/' + Date.now() + '_' + file.name);
-            alert('Uploading...');
-            await ref.put(file);
-            const url = await ref.getDownloadURL();
+        function sendImage() {
+            const url = prompt('Paste image URL here:');
+            if (!url) return;
             db.ref('rooms/' + currentRoom + '/messages').push({
                 sender: userId,
-                text: file.name,
+                text: 'Image',
                 url: url,
-                type: file.type.startsWith('image/') ? 'image' : 'file',
+                type: 'image',
                 read: false,
                 timestamp: Date.now()
             });
@@ -193,9 +183,7 @@
             
             let content = `<div>${data.text}</div>`;
             if (data.type === 'image') {
-                content = `<img src="${data.url}" class="media-content">`;
-            } else if (data.type === 'file') {
-                content = `<div style="background:rgba(0,0,0,0.1);padding:5px;border-radius:4px;"><a href="${data.url}" target="_blank" style="color:inherit;text-decoration:none;">📁 ${data.text}</a></div>`;
+                content = `<img src="${data.url}" class="media-content" onerror="this.src='https://via.placeholder.com/150?text=Invalid+Image'">`;
             }
 
             msgDiv.innerHTML = `
